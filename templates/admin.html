@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Music Suggestion System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="admin-body">
+    <!-- Top Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <span class="brand-icon">⚙️</span>
+                <span class="brand-title">Admin & MySQL Dashboard</span>
+            </div>
+            <nav class="nav-links">
+                <a href="/">← Back to App</a>
+                <a href="/admin" class="active">Admin Dashboard</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="admin-container">
+        <div class="admin-header">
+            <div>
+                <h1 class="page-title">Database & System Monitor</h1>
+                <p class="page-subtitle">Demonstration of live MySQL tables and user interactions.</p>
+            </div>
+            <button onclick="window.location.reload()" class="btn-secondary">
+                🔄 Refresh Data
+            </button>
+        </div>
+
+        <!-- Metric Counter Cards -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">🎵</div>
+                <div class="stat-info">
+                    <span class="stat-label">Total Songs</span>
+                    <h3 class="stat-value">{{ total_songs }}</h3>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👤</div>
+                <div class="stat-info">
+                    <span class="stat-label">Total Users</span>
+                    <h3 class="stat-value">{{ total_users }}</h3>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💬</div>
+                <div class="stat-info">
+                    <span class="stat-label">Total Requests</span>
+                    <h3 class="stat-value">{{ total_requests }}</h3>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⭐</div>
+                <div class="stat-info">
+                    <span class="stat-label">Total Feedback</span>
+                    <h3 class="stat-value">{{ total_feedback }}</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 1: User Profiles -->
+        <section class="table-section">
+            <div class="table-header">
+                <h2>User Profile Table (MySQL: <code>user_profile</code>)</h2>
+                <span class="badge badge-accent">Live Sync</span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Profile ID</th>
+                            <th>User</th>
+                            <th>Preferred Moods</th>
+                            <th>Preferred Genres</th>
+                            <th>Preferred Languages</th>
+                            <th>Liked Songs</th>
+                            <th>Last Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in profiles %}
+                        <tr>
+                            <td>#{{ p.profile_id }}</td>
+                            <td><strong>{{ p.user_name or 'User #' ~ p.user_id }}</strong></td>
+                            <td>
+                                {% if p.preferred_moods %}
+                                    <div class="tag-list">
+                                        {% for m in p.preferred_moods.split(',') %}
+                                            <span class="tag tag-mood">{{ m.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">None recorded</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if p.preferred_genres %}
+                                    <div class="tag-list">
+                                        {% for g in p.preferred_genres.split(',') %}
+                                            <span class="tag tag-genre">{{ g.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">None recorded</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p.preferred_languages or 'Hindi' }}</td>
+                            <td>
+                                {% if p.liked_songs %}
+                                    <div class="tag-list">
+                                        {% for s in p.liked_songs.split(',') %}
+                                            <span class="tag tag-song">❤️ {{ s.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">No liked songs yet</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ p.updated_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="text-center">No user profiles found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 2: User Requests -->
+        <section class="table-section">
+            <div class="table-header">
+                <h2>User Requests Table (MySQL: <code>user_requests</code>)</h2>
+                <span class="badge">{{ requests|length }} latest</span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>User</th>
+                            <th>Request Text</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in requests %}
+                        <tr>
+                            <td>#{{ r.request_id }}</td>
+                            <td><strong>{{ r.user_name or 'User #' ~ r.user_id }}</strong></td>
+                            <td class="query-cell">"{{ r.request_text }}"</td>
+                            <td class="text-muted">{{ r.created_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center">No user requests submitted yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 3: Feedback -->
+        <section class="table-section">
+            <div class="table-header">
+                <h2>Feedback Table (MySQL: <code>feedback</code>)</h2>
+                <span class="badge">{{ feedback|length }} records</span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Feedback ID</th>
+                            <th>User</th>
+                            <th>Song</th>
+                            <th>Type</th>
+                            <th>Rating</th>
+                            <th>Submitted At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in feedback %}
+                        <tr>
+                            <td>#{{ f.feedback_id }}</td>
+                            <td>{{ f.user_name or 'User #' ~ f.user_id }}</td>
+                            <td><strong>{{ f.song_title or 'Song #' ~ f.song_id }}</strong></td>
+                            <td>
+                                {% if f.feedback_type == 'like' %}
+                                    <span class="badge badge-success">👍 Like</span>
+                                {% elif f.feedback_type == 'dislike' %}
+                                    <span class="badge badge-danger">👎 Dislike</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">⏭ Skip</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if f.rating %}
+                                    <span class="rating-stars">{{ '★' * f.rating }}{{ '☆' * (5 - f.rating) }}</span> ({{ f.rating }}/5)
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ f.created_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-center">No feedback received yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 4: Songs Database -->
+        <section class="table-section">
+            <div class="table-header">
+                <h2>Songs Table (MySQL: <code>songs</code>)</h2>
+                <span class="badge badge-primary">{{ songs|length }} Songs</span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Movie</th>
+                            <th>Artist</th>
+                            <th>Genre</th>
+                            <th>Mood</th>
+                            <th>Language</th>
+                            <th>Activity</th>
+                            <th>Audio Preview</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in songs %}
+                        <tr>
+                            <td>{{ s.song_id }}</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                    <img src="/api/songs/{{ s.song_id }}/cover" alt="{{ s.title }}" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid rgba(255,255,255,0.15);">
+                                    <strong>{{ s.title }}</strong>
+                                </div>
+                            </td>
+                            <td>{{ s.movie }}</td>
+                            <td>{{ s.artist }}</td>
+                            <td><span class="tag tag-genre">{{ s.genre }}</span></td>
+                            <td>{{ s.mood }}</td>
+                            <td>{{ s.language }}</td>
+                            <td><span class="tag tag-activity">{{ s.activity }}</span></td>
+                            <td>
+                                {% if s.audio_url %}
+                                    <audio controls preload="none" style="height: 32px; max-width: 180px;">
+                                        <source src="{{ s.audio_url }}" type="audio/wav">
+                                    </audio>
+                                {% else %}
+                                    <span class="text-muted">Preview unavailable</span>
+                                {% endif %}
+                            </td>
+                            <td class="desc-cell">{{ s.description }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>MySQL Demonstration Panel &bull; Database: <code>music_recommendation_db</code></p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - Music Suggestion System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="profile-page-body">
+    <!-- Top Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="/" class="brand">
+                <span class="brand-icon">🎵</span>
+                <span class="brand-title">Music Suggestion System</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/">
+                    <span>🏠</span> Home
+                </a>
+                <a href="/profile" class="active nav-profile-link">
+                    <img src="{{ current_user.profile_image or '/static/images/default_avatar.svg' }}" alt="Avatar" class="nav-avatar">
+                    <span>{{ current_user.username or current_user.name }}</span>
+                </a>
+                <a href="/logout" class="nav-btn-logout">Logout</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content" style="padding-bottom: 140px;">
+        <!-- Flash Alerts -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="profile-alerts">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- A. Personal Information Hero Card -->
+        <section class="profile-hero-card">
+            <div class="profile-hero-content">
+                <div class="profile-avatar-container">
+                    <img 
+                        src="{{ current_user.profile_image or '/static/images/default_avatar.svg' }}" 
+                        alt="{{ current_user.username }}" 
+                        class="profile-large-avatar"
+                        id="current-profile-avatar"
+                    >
+                </div>
+                <div class="profile-details" style="flex: 1;">
+                    <div class="profile-meta-top">
+                        <h1 class="profile-username">{{ current_user.username or current_user.name }}</h1>
+                        <button id="toggle-edit-btn" class="btn-secondary btn-sm">
+                            ✏️ Edit Profile
+                        </button>
+                    </div>
+                    <p class="profile-email">
+                        <span>✉️</span> {{ current_user.email or 'No email recorded' }}
+                    </p>
+                    <p class="profile-joined">
+                        <span>🗓️</span> Member since {{ current_user.created_at.strftime('%B %Y') if current_user.created_at else 'Recent' }}
+                    </p>
+
+                    <!-- Selected Mood / Vibe Preferences -->
+                    <div class="profile-vibes-wrapper">
+                        <span class="vibes-title">Favorite Vibes & Moods:</span>
+                        <div class="vibes-badges-list">
+                            {% if user_preferences %}
+                                {% for pref in user_preferences %}
+                                    <span class="vibe-badge">✨ {{ pref.mood_or_vibe }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted" style="font-size: 0.88rem;">No vibes selected yet. Click Edit Profile to choose your music tastes!</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- B. Edit Profile Collapsible Form Panel -->
+        <section id="edit-profile-panel" class="edit-profile-card hidden">
+            <div class="card-header-row">
+                <h2 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 800;">✏️ Edit Your Profile</h2>
+                <button type="button" id="close-edit-btn" class="btn-icon-close" title="Close">✕</button>
+            </div>
+
+            <form method="POST" action="/profile/edit" enctype="multipart/form-data" class="edit-form">
+                <!-- Username -->
+                <div class="form-group">
+                    <label for="edit_username">Username</label>
+                    <div class="input-with-icon">
+                        <span class="field-icon">👤</span>
+                        <input 
+                            type="text" 
+                            id="edit_username" 
+                            name="username" 
+                            value="{{ current_user.username or current_user.name }}" 
+                            required 
+                            minlength="3"
+                            maxlength="30"
+                            pattern="^[a-zA-Z0-9_.-]+$"
+                        >
+                    </div>
+                </div>
+
+                <!-- Profile Picture Management -->
+                <div class="form-group">
+                    <label>Profile Picture</label>
+                    <div class="edit-avatar-row">
+                        <img 
+                            src="{{ current_user.profile_image or '/static/images/default_avatar.svg' }}" 
+                            alt="Current Avatar" 
+                            class="avatar-thumb"
+                            id="edit-avatar-thumb"
+                        >
+                        <div class="edit-avatar-btns" style="display: flex; gap: 0.75rem;">
+                            <label for="edit_profile_image" class="btn-secondary btn-sm" style="cursor: pointer;">
+                                📷 Choose Photo
+                            </label>
+                            <input 
+                                type="file" 
+                                id="edit_profile_image" 
+                                name="profile_image" 
+                                accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                                class="hidden"
+                            >
+                            {% if current_user.profile_image and current_user.profile_image != '/static/images/default_avatar.svg' %}
+                            <button type="submit" name="action" value="remove_avatar" class="btn-feedback btn-dislike btn-sm" onclick="return confirm('Reset to default avatar?');">
+                                🗑️ Remove Photo
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mood Preferences -->
+                <div class="form-group">
+                    <label>Your Preferred Vibes / Moods</label>
+                    <div class="vibe-edit-grid">
+                        {% set all_vibes = [
+                            'Romantic', 'Happy', 'Sad / Emotional', 'Calm / Peaceful', 
+                            'Energetic', 'Motivational', 'Spiritual', 'Travel / Adventure', 
+                            'Party / Celebration', 'Relaxing'
+                        ] %}
+                        {% set selected_names = user_preferences|map(attribute='mood_or_vibe')|list %}
+
+                        {% for vibe in all_vibes %}
+                            <label class="vibe-chip-compact {% if vibe in selected_names %}selected{% endif %}">
+                                <input 
+                                    type="checkbox" 
+                                    name="moods" 
+                                    value="{{ vibe }}" 
+                                    class="vibe-edit-checkbox"
+                                    {% if vibe in selected_names %}checked{% endif %}
+                                >
+                                <span>{{ vibe }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="submit" name="action" value="save" class="btn-primary">
+                        💾 Save Changes
+                    </button>
+                    <button type="button" id="cancel-edit-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- C. My Favourite Songs (Vertical Rectangular Cards in Horizontal Row - Requirement 4 & 6) -->
+        <section class="home-section favourites-section" id="favourites-section">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-romantic">❤️</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">My Favourite Songs</h2>
+                            <span class="section-count-badge count-pill">{{ favourites|length }} saved</span>
+                        </div>
+                        <p class="section-subtitle">Songs you have added to your favorites for instant listening.</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="favourites-list" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="favourites-list" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            {% if favourites and favourites|length > 0 %}
+                <div class="horizontal-cards-row" id="favourites-list">
+                    {% for song in favourites %}
+                        <div class="song-card favourite-card" data-song-id="{{ song.song_id }}">
+                            <!-- Portrait Card Artwork with Official Uploaded Poster from MySQL -->
+                            <div class="card-artwork-box">
+                                <img 
+                                    src="/api/songs/{{ song.song_id }}/cover" 
+                                    alt="{{ song.title }} Cover" 
+                                    class="card-poster-img"
+                                    loading="lazy"
+                                    onerror="this.style.display='none'"
+                                >
+                                <div class="card-poster-overlay"></div>
+                                <span class="card-match-pill">❤️ Favourite</span>
+                                <button class="btn-play-card btn-fav-play" 
+                                    data-song-id="{{ song.song_id }}" 
+                                    data-title="{{ song.title }}" 
+                                    data-artist="{{ song.artist or '' }}" 
+                                    data-movie="{{ song.movie or '' }}" 
+                                    data-audio-url="{{ song.audio_url }}"
+                                    title="Play {{ song.title }}">
+                                    ▶
+                                </button>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="card-body">
+                                <div class="card-title-group">
+                                    <h3 class="song-card-title">{{ song.title }}</h3>
+                                    <p class="song-card-meta">
+                                        <span class="movie-name">{{ song.movie or 'Single' }}</span> • {{ song.artist or 'Various' }}
+                                    </p>
+                                </div>
+
+                                <div class="card-tags">
+                                    {% if song.genre %}<span class="tag tag-genre">{{ song.genre }}</span>{% endif %}
+                                    {% if song.mood %}<span class="tag tag-mood">{{ song.mood }}</span>{% endif %}
+                                </div>
+
+                                <div class="card-footer">
+                                    <button 
+                                        class="btn-feedback btn-dislike btn-fav-remove" 
+                                        data-song-id="{{ song.song_id }}" 
+                                        title="Remove from Favourites"
+                                        style="width: 100%; justify-content: center; padding: 0.5rem;"
+                                    >
+                                        💔 Remove from Favorites
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state" style="background: #ffffff; border: 1.5px dashed var(--border-color); border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 0.75rem;">🤍</div>
+                    <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.4rem;">No favourite songs saved yet</h3>
+                    <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 1.5rem;">Discover songs on the Home page and click the ❤️ icon on any song to save it here!</p>
+                    <a href="/" class="btn-primary" style="text-decoration: none; display: inline-flex;">
+                        🎵 Discover Songs
+                    </a>
+                </div>
+            {% endif %}
+        </section>
+
+        <!-- D. My Listening History Section (Requirement 6 & 8) -->
+        <section class="listening-history-section" id="listening-history-section">
+            <div class="section-header-row" style="margin-bottom: 0.5rem;">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-vibe">📊</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">My Listening History</h2>
+                            <span class="section-count-badge">{{ playbacks|length }} plays</span>
+                        </div>
+                        <p class="section-subtitle">Track your recent song playbacks, mood searches, ratings, likes/dislikes, and favorites.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Navigation Tabs -->
+            <div class="history-tabs-nav">
+                <button type="button" class="history-tab-btn active" data-tab="tab-playbacks">
+                    🎧 Recent Plays ({{ playbacks|length }})
+                </button>
+                <button type="button" class="history-tab-btn" data-tab="tab-searches">
+                    🔍 Mood Searches ({{ searches|length }})
+                </button>
+                <button type="button" class="history-tab-btn" data-tab="tab-feedback">
+                    ⭐ Ratings &amp; Feedback ({{ feedback_records|length }})
+                </button>
+                <button type="button" class="history-tab-btn" data-tab="tab-favourites">
+                    ❤️ Favorite Activity ({{ fav_activities|length }})
+                </button>
+            </div>
+
+            <!-- Tab 1: Recent Plays -->
+            <div class="history-tab-pane active" id="tab-playbacks">
+                {% if playbacks and playbacks|length > 0 %}
+                    <div class="history-table-wrapper">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Song</th>
+                                    <th>Movie / Artist</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                    <th>Played At</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in playbacks %}
+                                    <tr>
+                                        <td>
+                                            <div class="history-song-cell">
+                                                <img 
+                                                    src="/api/songs/{{ item.song_id }}/cover" 
+                                                    alt="{{ item.title }}" 
+                                                    class="history-song-thumb"
+                                                    loading="lazy"
+                                                    onerror="this.style.display='none'"
+                                                >
+                                                <div>
+                                                    <strong style="color: var(--text-primary);">{{ item.title }}</strong>
+                                                    {% if item.mood %}
+                                                        <span class="tag tag-mood" style="margin-left: 0.35rem; font-size: 0.7rem;">{{ item.mood }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-secondary">{{ item.movie or '' }}{% if item.artist and item.movie %} • {% endif %}{{ item.artist or '' }}</td>
+                                        <td>
+                                            <span class="badge-status status-{{ item.status }}">
+                                                {% if item.status == 'started' %}▶ Started{% elif item.status == 'completed' %}✓ Completed{% elif item.status == 'skipped' %}⏭ Skipped{% else %}⏸ Stopped{% endif %}
+                                            </span>
+                                        </td>
+                                        <td style="color: var(--text-muted); font-variant-numeric: tabular-nums;">{{ (item.duration_played | round(1)) if item.duration_played else 0 }}s</td>
+                                        <td style="color: var(--text-muted); font-size: 0.82rem;">{{ item.played_at.strftime('%Y-%m-%d %H:%M') if item.played_at else 'Recent' }}</td>
+                                        <td>
+                                            <button 
+                                                class="btn-primary btn-sm btn-fav-play" 
+                                                data-song-id="{{ item.song_id }}"
+                                                data-title="{{ item.title }}"
+                                                data-artist="{{ item.artist or '' }}"
+                                                data-movie="{{ item.movie or '' }}"
+                                                data-audio-url="{{ item.audio_url }}"
+                                                title="Play {{ item.title }}"
+                                            >
+                                                ▶ Play
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-tab-state">
+                        <div class="empty-icon">🎧</div>
+                        <p>No playback history recorded yet. Play any recommended song to see it logged here!</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab 2: Mood Searches -->
+            <div class="history-tab-pane hidden" id="tab-searches">
+                {% if searches and searches|length > 0 %}
+                    <div class="history-list-cards">
+                        {% for req in searches %}
+                            <div class="history-card">
+                                <div class="history-card-icon">🔍</div>
+                                <div class="history-card-body">
+                                    <p class="history-prompt-text">"{{ req.request_text }}"</p>
+                                    <span class="history-timestamp">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else 'Recent' }}</span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-tab-state">
+                        <div class="empty-icon">🔍</div>
+                        <p>No mood searches yet. Tell the system how you're feeling on the home page to get recommendations!</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab 3: Ratings & Feedback -->
+            <div class="history-tab-pane hidden" id="tab-feedback">
+                {% if feedback_records and feedback_records|length > 0 %}
+                    <div class="history-table-wrapper">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Song</th>
+                                    <th>Movie / Artist</th>
+                                    <th>Feedback Type</th>
+                                    <th>Rating</th>
+                                    <th>Recorded At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in feedback_records %}
+                                    <tr>
+                                        <td>
+                                            <div class="history-song-cell">
+                                                <img 
+                                                    src="/api/songs/{{ item.song_id }}/cover" 
+                                                    alt="{{ item.title }}" 
+                                                    class="history-song-thumb"
+                                                    loading="lazy"
+                                                    onerror="this.style.display='none'"
+                                                >
+                                                <div>
+                                                    <strong style="color: var(--text-primary);">{{ item.title }}</strong>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-secondary">{{ item.movie or '' }}{% if item.artist and item.movie %} • {% endif %}{{ item.artist or '' }}</td>
+                                        <td>
+                                            <span class="badge-feedback feedback-{{ item.feedback_type }}">
+                                                {% if item.feedback_type == 'like' %}👍 Liked
+                                                {% elif item.feedback_type == 'dislike' %}👎 Disliked
+                                                {% elif item.feedback_type == 'skip' %}⏭ Skipped
+                                                {% elif item.feedback_type == 'rating' %}⭐ Rated
+                                                {% elif item.feedback_type == 'play' %}▶ Played
+                                                {% else %}{{ item.feedback_type }}
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if item.rating %}
+                                                <span style="color: #f59e0b; font-weight: 700;">
+                                                    {% for i in range(1, 6) %}
+                                                        {% if i <= item.rating %}★{% else %}☆{% endif %}
+                                                    {% endfor %}
+                                                    ({{ item.rating }}/5)
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="color: var(--text-muted); font-size: 0.82rem;">{{ item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else 'Recent' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-tab-state">
+                        <div class="empty-icon">⭐</div>
+                        <p>No ratings or feedback given yet. Like, dislike, skip or rate songs on the home page!</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab 4: Favorite Activity -->
+            <div class="history-tab-pane hidden" id="tab-favourites">
+                {% if fav_activities and fav_activities|length > 0 %}
+                    <div class="history-table-wrapper">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Song</th>
+                                    <th>Movie / Artist</th>
+                                    <th>Action</th>
+                                    <th>Date &amp; Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for act in fav_activities %}
+                                    <tr>
+                                        <td>
+                                            <div class="history-song-cell">
+                                                <img 
+                                                    src="/api/songs/{{ act.song_id }}/cover" 
+                                                    alt="{{ act.title }}" 
+                                                    class="history-song-thumb"
+                                                    loading="lazy"
+                                                    onerror="this.style.display='none'"
+                                                >
+                                                <div>
+                                                    <strong style="color: var(--text-primary);">{{ act.title }}</strong>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-secondary">{{ act.movie or '' }}{% if act.artist and act.movie %} • {% endif %}{{ act.artist or '' }}</td>
+                                        <td>
+                                            <span class="badge-action action-{{ act.action }}">
+                                                {% if act.action == 'added' %}
+                                                    ❤️ Added to favorites
+                                                {% else %}
+                                                    🤍 Removed from favorites
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td style="color: var(--text-muted); font-size: 0.82rem;">{{ act.created_at.strftime('%Y-%m-%d %H:%M') if act.created_at else 'Recent' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-tab-state">
+                        <div class="empty-icon">❤️</div>
+                        <p>No favorite actions recorded yet. Add songs to your favorites to see them tracked here!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Global Music Player Bar (Docked smoothly above bottom) -->
+        <div id="music-player-bar" class="music-player-bar hidden">
+            <div class="player-container">
+                <!-- LEFT SECTION: Artwork, Meta, Status -->
+                <div class="player-track-info">
+                    <div class="player-art-wrap">
+                        <img id="player-cover-art" src="/static/images/default_avatar.svg" alt="Song Cover" class="player-cover-art hidden">
+                        <span id="player-art-placeholder" class="player-art-placeholder">🎵</span>
+                    </div>
+                    <div class="player-meta">
+                        <div class="player-status-badge-row">
+                            <span id="player-status-badge" class="player-status-badge is-playing">▶ Playing</span>
+                        </div>
+                        <h4 id="player-title" class="player-title">Song Title</h4>
+                        <p id="player-artist" class="player-artist">
+                            <span id="player-movie" class="movie-name">Movie</span>
+                            <span id="player-meta-sep">•</span>
+                            <span id="player-artist-name">Artist</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- MIDDLE SECTION: Prev, Play/Pause, Next/Skip, Progress Slider, Duration -->
+                <div class="player-controls-center">
+                    <div class="player-buttons">
+                        <button type="button" id="player-prev-btn" class="player-btn-nav" title="Previous Song (or Restart)">⏮</button>
+                        <button type="button" id="player-play-btn" class="player-btn-main" title="Play">▶</button>
+                        <button type="button" id="player-pause-btn" class="player-btn-main hidden" title="Pause">⏸</button>
+                        <button type="button" id="player-skip-btn" class="player-btn-nav" title="Skip to Next Song">⏭</button>
+                    </div>
+                    <div class="player-progress-row">
+                        <span id="player-current-time" class="player-time">0:00</span>
+                        <input type="range" id="player-progress-bar" class="player-progress-slider" min="0" max="100" value="0" step="0.1" title="Seek Progress">
+                        <span id="player-duration-time" class="player-time">0:00</span>
+                    </div>
+                    <div id="player-status-message" class="player-status-message hidden"></div>
+                </div>
+
+                <!-- RIGHT SECTION: Volume, Like, Dislike, Favourite, Rating, Close -->
+                <div class="player-actions-right">
+                    <!-- Volume Control -->
+                    <div class="player-volume-control">
+                        <span id="player-volume-icon" class="volume-icon" title="Volume">🔊</span>
+                        <input type="range" id="player-volume-slider" class="player-volume-slider" min="0" max="1" step="0.05" value="0.8" title="Volume">
+                    </div>
+
+                    <!-- Like / Dislike Buttons -->
+                    <div class="player-feedback-btns">
+                        <button type="button" id="player-like-btn" class="btn-player-action btn-player-like" title="Like Song">👍</button>
+                        <button type="button" id="player-dislike-btn" class="btn-player-action btn-player-dislike" title="Dislike Song">👎</button>
+                    </div>
+
+                    <!-- Favourite Toggle Button -->
+                    <button type="button" id="player-fav-btn" class="btn-player-fav" title="Add to favorites">
+                        <span class="player-fav-icon">🤍</span>
+                        <span class="player-fav-text">Favorite</span>
+                    </button>
+
+                    <!-- Star Rating 1-5 -->
+                    <div class="player-star-rating" id="player-star-rating" title="Rate this song">
+                        <button type="button" class="player-star-btn" data-rating="1" title="1 Star">★</button>
+                        <button type="button" class="player-star-btn" data-rating="2" title="2 Stars">★</button>
+                        <button type="button" class="player-star-btn" data-rating="3" title="3 Stars">★</button>
+                        <button type="button" class="player-star-btn" data-rating="4" title="4 Stars">★</button>
+                        <button type="button" class="player-star-btn" data-rating="5" title="5 Stars">★</button>
+                    </div>
+
+                    <!-- Close / Stop Button -->
+                    <button type="button" id="player-close-btn" class="btn-player-close" title="Close Player & Stop">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Toast Notification -->
+        <div id="toast" class="toast hidden"></div>
+    </main>
+
+    <footer class="footer">
+        <p>Music Suggestion System &bull; Personalized music suggestions for every mood</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Profile Page Edit Toggle
+        const toggleEditBtn = document.getElementById("toggle-edit-btn");
+        const closeEditBtn = document.getElementById("close-edit-btn");
+        const cancelEditBtn = document.getElementById("cancel-edit-btn");
+        const editPanel = document.getElementById("edit-profile-panel");
+
+        if (toggleEditBtn && editPanel) {
+            toggleEditBtn.addEventListener("click", () => {
+                editPanel.classList.toggle("hidden");
+                if (!editPanel.classList.contains("hidden")) {
+                    editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }
+            });
+        }
+        if (closeEditBtn && editPanel) {
+            closeEditBtn.addEventListener("click", () => editPanel.classList.add("hidden"));
+        }
+        if (cancelEditBtn && editPanel) {
+            cancelEditBtn.addEventListener("click", () => editPanel.classList.add("hidden"));
+        }
+
+        // Live preview for edit avatar input
+        const editFileInput = document.getElementById("edit_profile_image");
+        const editThumb = document.getElementById("edit-avatar-thumb");
+        if (editFileInput && editThumb) {
+            editFileInput.addEventListener("change", function() {
+                const file = this.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        editThumb.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Interactive vibe chip checkboxes in Edit mode
+        document.querySelectorAll(".vibe-chip-compact").forEach(chip => {
+            const cb = chip.querySelector(".vibe-edit-checkbox");
+            chip.addEventListener("click", (e) => {
+                if (e.target.tagName !== "INPUT") {
+                    cb.checked = !cb.checked;
+                }
+                chip.classList.toggle("selected", cb.checked);
+            });
+        });
+
+        // Wire Favourites Card Remove button
+        document.querySelectorAll(".btn-fav-remove").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const songId = btn.getAttribute("data-song-id");
+                try {
+                    const res = await fetch("/api/favourites/toggle", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ song_id: parseInt(songId, 10) })
+                    });
+                    const data = await res.json();
+                    if (data.success && !data.is_favourite) {
+                        const card = btn.closest(".song-card");
+                        if (card) {
+                            card.style.opacity = "0";
+                            card.style.transform = "scale(0.95)";
+                            setTimeout(() => {
+                                card.remove();
+                                const remaining = document.querySelectorAll(".favourite-card").length;
+                                const pill = document.querySelector(".count-pill");
+                                if (pill) pill.textContent = remaining + " saved";
+                                if (remaining === 0) {
+                                    window.location.reload();
+                                }
+                            }, 250);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error removing favourite:", err);
+                }
+            });
+        });
+
+        // History Tabs Switching
+        document.querySelectorAll(".history-tab-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".history-tab-btn").forEach(b => b.classList.remove("active"));
+                document.querySelectorAll(".history-tab-pane").forEach(p => p.classList.add("hidden"));
+                btn.classList.add("active");
+                const targetId = btn.getAttribute("data-tab");
+                const targetPane = document.getElementById(targetId);
+                if (targetPane) {
+                    targetPane.classList.remove("hidden");
+                }
+            });
+        });
+    </script>
+</body>
+</html>

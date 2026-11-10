@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Setup - Music Suggestion System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="setup-body">
+    <div class="setup-container">
+        <div class="setup-card">
+            <div class="setup-header">
+                <div class="setup-badge">Step 1 of 1</div>
+                <h1 class="setup-title">Personalize Your Music Profile</h1>
+                <p class="setup-subtitle">Tell us what vibes you enjoy so we can tailor recommendations to your taste.</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="auth-alerts">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="/profile-setup" enctype="multipart/form-data" class="setup-form" id="profile-setup-form">
+                <!-- 1. Username confirmation / edit -->
+                <div class="setup-section">
+                    <label class="section-label" for="username">
+                        <span class="label-num">1</span>
+                        <span>Your Username</span>
+                    </label>
+                    <div class="input-with-icon">
+                        <span class="field-icon">👤</span>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            value="{{ current_user.username or current_user.name }}" 
+                            required 
+                            minlength="3"
+                            maxlength="30"
+                            pattern="^[a-zA-Z0-9_.-]+$"
+                            class="input-clean"
+                        >
+                    </div>
+                    <small class="form-hint">This is how your name will appear on the platform.</small>
+                </div>
+
+                <!-- 2. Mood / Vibe Preferences -->
+                <div class="setup-section">
+                    <label class="section-label">
+                        <span class="label-num">2</span>
+                        <span>What vibes and moods do you love? <small class="text-muted">(Select all that apply)</small></span>
+                    </label>
+
+                    <div class="vibe-grid">
+                        {% set vibe_options = [
+                            ('Romantic', '💖 Romantic', 'Warm, intimate and emotional love songs'),
+                            ('Happy', '☀️ Happy', 'Cheerful, feel-good, upbeat tunes'),
+                            ('Sad / Emotional', '🌧️ Sad / Emotional', 'Deep, soulful, and touching melodies'),
+                            ('Calm / Peaceful', '🍃 Calm / Peaceful', 'Serene, soothing, and relaxing sounds'),
+                            ('Energetic', '⚡ Energetic', 'High tempo, pulse-raising tracks'),
+                            ('Motivational', '🔥 Motivational', 'Inspiring, power-packed anthems'),
+                            ('Spiritual', '✨ Spiritual', 'Transcendent, sufi, and meditative music'),
+                            ('Travel / Adventure', '🚗 Travel / Adventure', 'Wanderlust, road-trip, and free-spirited songs'),
+                            ('Party / Celebration', '🎉 Party / Celebration', 'Dance, celebratory, and festive beats'),
+                            ('Relaxing', '☕ Relaxing', 'Chill acoustic, study, and unwind music')
+                        ] %}
+
+                        {% for vibe_val, vibe_label, vibe_desc in vibe_options %}
+                            <label class="vibe-chip-card {% if vibe_val in user_selected_moods %}selected{% endif %}">
+                                <input 
+                                    type="checkbox" 
+                                    name="moods" 
+                                    value="{{ vibe_val }}" 
+                                    class="vibe-checkbox"
+                                    {% if vibe_val in user_selected_moods %}checked{% endif %}
+                                >
+                                <span class="vibe-chip-title">{{ vibe_label }}</span>
+                                <span class="vibe-chip-desc">{{ vibe_desc }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 3. Profile Image Upload -->
+                <div class="setup-section">
+                    <label class="section-label">
+                        <span class="label-num">3</span>
+                        <span>Profile Picture <small class="text-muted">(Optional)</small></span>
+                    </label>
+
+                    <div class="avatar-upload-box">
+                        <div class="avatar-preview-wrapper">
+                            <img 
+                                id="avatar-preview" 
+                                src="{{ current_user.profile_image or '/static/images/default_avatar.svg' }}" 
+                                alt="Avatar Preview" 
+                                class="avatar-preview-img"
+                            >
+                        </div>
+                        <div class="avatar-upload-actions">
+                            <label for="profile_image_input" class="btn-secondary btn-file-label">
+                                📷 Choose Photo
+                            </label>
+                            <input 
+                                type="file" 
+                                id="profile_image_input" 
+                                name="profile_image" 
+                                accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                                class="hidden-file-input"
+                            >
+                            <div class="skip-image-option">
+                                <label class="checkbox-inline">
+                                    <input type="checkbox" id="skip_image" name="skip_image" value="1">
+                                    <span>Skip for now (use default avatar)</span>
+                                </label>
+                            </div>
+                            <small class="form-hint">Supported formats: JPG, PNG, WEBP, GIF (Max 5MB)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Action Buttons -->
+                <div class="setup-actions">
+                    <button type="submit" name="action" value="save" class="btn-primary">
+                        <span>Save Profile & Start Listening</span>
+                        <span>→</span>
+                    </button>
+                    <button type="submit" name="action" value="skip" class="btn-secondary">
+                        <span>Skip for Now</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Interactive Vibe Card Checkbox Highlighting
+        document.querySelectorAll(".vibe-chip-card").forEach(card => {
+            const checkbox = card.querySelector(".vibe-checkbox");
+            card.addEventListener("click", (e) => {
+                if (e.target.tagName !== "INPUT") {
+                    checkbox.checked = !checkbox.checked;
+                }
+                if (checkbox.checked) {
+                    card.classList.add("selected");
+                } else {
+                    card.classList.remove("selected");
+                }
+            });
+        });
+
+        // Live Avatar Image Preview
+        const fileInput = document.getElementById("profile_image_input");
+        const previewImg = document.getElementById("avatar-preview");
+        const skipCheck = document.getElementById("skip_image");
+
+        fileInput.addEventListener("change", function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    if (skipCheck) skipCheck.checked = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        if (skipCheck) {
+            skipCheck.addEventListener("change", function() {
+                if (this.checked) {
+                    fileInput.value = "";
+                    previewImg.src = "/static/images/default_avatar.svg";
+                }
+            });
+        }
+    </script>
+</body>
+</html>

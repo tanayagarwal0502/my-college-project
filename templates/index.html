@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Suggestion System - Modern Music Discovery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Modern Navigation Bar -->
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="/" class="brand">
+                <span class="brand-icon">🎵</span>
+                <span class="brand-title">Music Suggestion System</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/" class="active">
+                    <span>🏠</span> Home
+                </a>
+                <a href="/profile" class="nav-profile-link" title="My Profile">
+                    <img src="{{ current_user.profile_image or '/static/images/default_avatar.svg' }}" alt="Avatar" class="nav-avatar">
+                    <span>{{ current_user.username or current_user.name or 'Profile' }}</span>
+                </a>
+                <a href="/logout" class="nav-btn-logout" title="Sign Out">
+                    <span>Logout</span> <span>➔</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <!-- Global Toast Notification -->
+        <div id="toast" class="toast hidden"></div>
+
+        <!-- SECTION A: Welcome and Hero Overview -->
+        <section class="home-section section-welcome-chat" id="search-chat-section">
+            <div class="hero-header">
+                <h1 class="main-heading">Welcome!!</h1>
+                <p class="subtitle">Tell us how you are feeling or what vibe you want, and we'll suggest the perfect soundtrack tailored to your emotions.</p>
+
+                {% if user_vibes %}
+                    <div class="user-vibe-pill-strip">
+                        <span class="dock-chip-label" style="align-self: center;">Your Preferred Vibes:</span>
+                        {% for vibe in user_vibes %}
+                            <span class="vibe-tag-active">✨ {{ vibe }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- DYNAMIC RESULTS SECTION: Generated Recommendations -->
+        <section class="home-section hidden" id="recommendation-results">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-results">🔍</div>
+                    <div>
+                        <h2 class="section-title">Your Tailored Recommendations</h2>
+                        <p class="section-subtitle" id="recommendation-query-echo">Results matching your mood prompt</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="recommended-songs-container" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="recommended-songs-container" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            <!-- Dynamic Horizontal Cards Row -->
+            <div class="horizontal-cards-row" id="recommended-songs-container"></div>
+        </section>
+
+        <!-- SECTION B: Recommended for Your Vibe (Horizontal Row) -->
+        <section class="home-section" id="vibe-recommendations-section">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-vibe">🌟</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">Recommended for Your Vibe</h2>
+                            <span class="section-count-badge">{{ vibe_recommendations|length }} songs</span>
+                        </div>
+                        <p class="section-subtitle">Automatically matched to your profile mood preferences.</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="vibe-songs-container" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="vibe-songs-container" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            <div class="horizontal-cards-row" id="vibe-songs-container">
+                {% if vibe_recommendations %}
+                    {% for song in vibe_recommendations %}
+                        <div class="song-card vibe-card" data-song-id="{{ song.song_id }}" data-queue-type="vibe">
+                            <!-- Portrait Card Artwork with Official Uploaded Poster from MySQL -->
+                            <div class="card-artwork-box">
+                                <img 
+                                    src="/api/songs/{{ song.song_id }}/cover" 
+                                    alt="{{ song.title }} Cover" 
+                                    class="card-poster-img"
+                                    loading="lazy"
+                                    onerror="this.style.display='none'"
+                                >
+                                <div class="card-poster-overlay"></div>
+                                <span class="card-match-pill">✨ {{ song.match_percentage }}% Match</span>
+                                <button class="btn-play-card" 
+                                    data-song-id="{{ song.song_id }}" 
+                                    data-title="{{ song.title }}" 
+                                    data-artist="{{ song.artist or '' }}" 
+                                    data-movie="{{ song.movie or '' }}" 
+                                    data-audio-url="{{ song.audio_url }}"
+                                    title="Play {{ song.title }}">
+                                    ▶
+                                </button>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="card-body">
+                                <div class="card-title-group">
+                                    <h3 class="song-card-title">{{ song.title }}</h3>
+                                    <p class="song-card-meta">
+                                        <span class="movie-name">{{ song.movie or 'Single' }}</span> • {{ song.artist or 'Various' }}
+                                    </p>
+                                </div>
+
+                                <div class="card-tags">
+                                    {% if song.genre %}<span class="tag tag-genre">{{ song.genre }}</span>{% endif %}
+                                    {% if song.mood %}<span class="tag tag-mood">{{ song.mood }}</span>{% endif %}
+                                </div>
+
+                                {% if song.dynamic_note %}
+                                    <div class="dynamic-note">"{{ song.dynamic_note }}"</div>
+                                {% endif %}
+
+                                <div class="card-footer">
+                                    <!-- Feedback Buttons -->
+                                    <div class="card-actions-row">
+                                        <button class="btn-feedback btn-like" title="Like">👍 Like</button>
+                                        <button class="btn-feedback btn-dislike" title="Dislike">👎 Dislike</button>
+                                        <button class="btn-feedback btn-skip" title="Skip to next song">⏭ Skip</button>
+                                    </div>
+
+                                    <!-- Favourite Button -->
+                                    <button class="btn-fav-heart {% if song.is_favourite %}is-favourite{% endif %}" 
+                                        data-song-id="{{ song.song_id }}" 
+                                        title="{% if song.is_favourite %}Remove from favorites{% else %}Add to favorites{% endif %}">
+                                        <span class="heart-icon">{% if song.is_favourite %}❤️{% else %}🤍{% endif %}</span>
+                                        <span class="heart-text">{% if song.is_favourite %}Added to favorites{% else %}Favorite{% endif %}</span>
+                                    </button>
+
+                                    <!-- Star Rating 1-5 -->
+                                    <div class="star-rating-row">
+                                        <span class="rating-label">Rate:</span>
+                                        <div class="star-rating">
+                                            <button class="star-btn" data-rating="1" title="1 Star">★</button>
+                                            <button class="star-btn" data-rating="2" title="2 Stars">★</button>
+                                            <button class="star-btn" data-rating="3" title="3 Stars">★</button>
+                                            <button class="star-btn" data-rating="4" title="4 Stars">★</button>
+                                            <button class="star-btn" data-rating="5" title="5 Stars">★</button>
+                                        </div>
+                                    </div>
+                                    <div class="audio-error-msg hidden">Audio unavailable for this song.</div>
+                                    <div class="feedback-status hidden"></div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No vibe recommendations available. Select your mood preferences in your Profile!</div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- SECTION C: Personalized Recommendations (Horizontal Row) -->
+        <section class="home-section" id="personalized-recommendations-section">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-personalized">🔮</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">Personalized Recommendations</h2>
+                            <span class="section-count-badge">History-Aware</span>
+                        </div>
+                        <p class="section-subtitle">Tailored using your previous searches, favourites, ratings, and listening history.</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="personalized-songs-container" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="personalized-songs-container" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            <div class="horizontal-cards-row" id="personalized-songs-container">
+                {% if personalized_recommendations %}
+                    {% for song in personalized_recommendations %}
+                        <div class="song-card personalized-card" data-song-id="{{ song.song_id }}" data-queue-type="personalized">
+                            <!-- Portrait Card Artwork with Official Uploaded Poster from MySQL -->
+                            <div class="card-artwork-box">
+                                <img 
+                                    src="/api/songs/{{ song.song_id }}/cover" 
+                                    alt="{{ song.title }} Cover" 
+                                    class="card-poster-img"
+                                    loading="lazy"
+                                    onerror="this.style.display='none'"
+                                >
+                                <div class="card-poster-overlay"></div>
+                                <span class="card-match-pill">✨ {{ song.match_percentage }}% Match</span>
+                                <button class="btn-play-card" 
+                                    data-song-id="{{ song.song_id }}" 
+                                    data-title="{{ song.title }}" 
+                                    data-artist="{{ song.artist or '' }}" 
+                                    data-movie="{{ song.movie or '' }}" 
+                                    data-audio-url="{{ song.audio_url }}"
+                                    title="Play {{ song.title }}">
+                                    ▶
+                                </button>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="card-body">
+                                <div class="card-title-group">
+                                    <h3 class="song-card-title">{{ song.title }}</h3>
+                                    <p class="song-card-meta">
+                                        <span class="movie-name">{{ song.movie or 'Single' }}</span> • {{ song.artist or 'Various' }}
+                                    </p>
+                                </div>
+
+                                <div class="card-tags">
+                                    {% if song.genre %}<span class="tag tag-genre">{{ song.genre }}</span>{% endif %}
+                                    {% if song.mood %}<span class="tag tag-mood">{{ song.mood }}</span>{% endif %}
+                                </div>
+
+                                {% if song.dynamic_note %}
+                                    <div class="dynamic-note">"{{ song.dynamic_note }}"</div>
+                                {% endif %}
+
+                                <div class="card-footer">
+                                    <!-- Feedback Buttons -->
+                                    <div class="card-actions-row">
+                                        <button class="btn-feedback btn-like" title="Like">👍 Like</button>
+                                        <button class="btn-feedback btn-dislike" title="Dislike">👎 Dislike</button>
+                                        <button class="btn-feedback btn-skip" title="Skip to next song">⏭ Skip</button>
+                                    </div>
+
+                                    <!-- Favourite Button -->
+                                    <button class="btn-fav-heart {% if song.is_favourite %}is-favourite{% endif %}" 
+                                        data-song-id="{{ song.song_id }}" 
+                                        title="{% if song.is_favourite %}Remove from favorites{% else %}Add to favorites{% endif %}">
+                                        <span class="heart-icon">{% if song.is_favourite %}❤️{% else %}🤍{% endif %}</span>
+                                        <span class="heart-text">{% if song.is_favourite %}Added to favorites{% else %}Favorite{% endif %}</span>
+                                    </button>
+
+                                    <!-- Star Rating 1-5 -->
+                                    <div class="star-rating-row">
+                                        <span class="rating-label">Rate:</span>
+                                        <div class="star-rating">
+                                            <button class="star-btn" data-rating="1" title="1 Star">★</button>
+                                            <button class="star-btn" data-rating="2" title="2 Stars">★</button>
+                                            <button class="star-btn" data-rating="3" title="3 Stars">★</button>
+                                            <button class="star-btn" data-rating="4" title="4 Stars">★</button>
+                                            <button class="star-btn" data-rating="5" title="5 Stars">★</button>
+                                        </div>
+                                    </div>
+                                    <div class="audio-error-msg hidden">Audio unavailable for this song.</div>
+                                    <div class="feedback-status hidden"></div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">Interact with songs or search to see your personalized recommendations here!</div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- SECTION D: Romantic & Heartfelt Vibes (Horizontal Row) -->
+        {% if romantic_songs %}
+        <section class="home-section" id="romantic-recommendations-section">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-romantic">💖</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">Romantic & Heartfelt Vibes</h2>
+                            <span class="section-count-badge">{{ romantic_songs|length }} songs</span>
+                        </div>
+                        <p class="section-subtitle">Intimate love songs, emotional acoustic melodies, and heartfelt ballads.</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="romantic-songs-container" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="romantic-songs-container" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            <div class="horizontal-cards-row" id="romantic-songs-container">
+                {% for song in romantic_songs %}
+                    <div class="song-card" data-song-id="{{ song.song_id }}" data-queue-type="romantic">
+                        <div class="card-artwork-box">
+                            <img 
+                                src="/api/songs/{{ song.song_id }}/cover" 
+                                alt="{{ song.title }} Cover" 
+                                class="card-poster-img"
+                                loading="lazy"
+                                onerror="this.style.display='none'"
+                            >
+                            <div class="card-poster-overlay"></div>
+                            <span class="card-match-pill">Romantic</span>
+                            <button class="btn-play-card" 
+                                data-song-id="{{ song.song_id }}" 
+                                data-title="{{ song.title }}" 
+                                data-artist="{{ song.artist or '' }}" 
+                                data-movie="{{ song.movie or '' }}" 
+                                data-audio-url="{{ song.audio_url }}"
+                                title="Play {{ song.title }}">
+                                ▶
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-title-group">
+                                <h3 class="song-card-title">{{ song.title }}</h3>
+                                <p class="song-card-meta"><span class="movie-name">{{ song.movie or 'Single' }}</span> • {{ song.artist or 'Various' }}</p>
+                            </div>
+                            <div class="card-tags">
+                                <span class="tag tag-mood">💖 Romantic</span>
+                                <span class="tag tag-genre">{{ song.genre }}</span>
+                            </div>
+                            <div class="card-footer">
+                                <div class="card-actions-row">
+                                    <button class="btn-feedback btn-like" title="Like">👍 Like</button>
+                                    <button class="btn-feedback btn-dislike" title="Dislike">👎 Dislike</button>
+                                    <button class="btn-feedback btn-skip" title="Skip">⏭ Skip</button>
+                                </div>
+                                <button class="btn-fav-heart {% if song.is_favourite %}is-favourite{% endif %}" data-song-id="{{ song.song_id }}">
+                                    <span class="heart-icon">{% if song.is_favourite %}❤️{% else %}🤍{% endif %}</span>
+                                    <span class="heart-text">{% if song.is_favourite %}Added to favorites{% else %}Favorite{% endif %}</span>
+                                </button>
+                                <div class="star-rating-row">
+                                    <span class="rating-label">Rate:</span>
+                                    <div class="star-rating">
+                                        <button class="star-btn" data-rating="1">★</button>
+                                        <button class="star-btn" data-rating="2">★</button>
+                                        <button class="star-btn" data-rating="3">★</button>
+                                        <button class="star-btn" data-rating="4">★</button>
+                                        <button class="star-btn" data-rating="5">★</button>
+                                    </div>
+                                </div>
+                                <div class="audio-error-msg hidden">Audio unavailable for this song.</div>
+                                <div class="feedback-status hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- SECTION E: Energetic & Motivational Anthems (Horizontal Row) -->
+        {% if energetic_songs %}
+        <section class="home-section" id="energetic-recommendations-section">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-energetic">⚡</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">Energetic & Motivational Anthems</h2>
+                            <span class="section-count-badge">{{ energetic_songs|length }} songs</span>
+                        </div>
+                        <p class="section-subtitle">High-tempo beats, motivational anthems, workout tracks, and party celebrations.</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="energetic-songs-container" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="energetic-songs-container" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            <div class="horizontal-cards-row" id="energetic-songs-container">
+                {% for song in energetic_songs %}
+                    <div class="song-card" data-song-id="{{ song.song_id }}" data-queue-type="energetic">
+                        <div class="card-artwork-box">
+                            <img 
+                                src="/api/songs/{{ song.song_id }}/cover" 
+                                alt="{{ song.title }} Cover" 
+                                class="card-poster-img"
+                                loading="lazy"
+                                onerror="this.style.display='none'"
+                            >
+                            <div class="card-poster-overlay"></div>
+                            <span class="card-match-pill">Energetic</span>
+                            <button class="btn-play-card" 
+                                data-song-id="{{ song.song_id }}" 
+                                data-title="{{ song.title }}" 
+                                data-artist="{{ song.artist or '' }}" 
+                                data-movie="{{ song.movie or '' }}" 
+                                data-audio-url="{{ song.audio_url }}"
+                                title="Play {{ song.title }}">
+                                ▶
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-title-group">
+                                <h3 class="song-card-title">{{ song.title }}</h3>
+                                <p class="song-card-meta"><span class="movie-name">{{ song.movie or 'Single' }}</span> • {{ song.artist or 'Various' }}</p>
+                            </div>
+                            <div class="card-tags">
+                                <span class="tag tag-mood">⚡ Energetic</span>
+                                <span class="tag tag-genre">{{ song.genre }}</span>
+                            </div>
+                            <div class="card-footer">
+                                <div class="card-actions-row">
+                                    <button class="btn-feedback btn-like" title="Like">👍 Like</button>
+                                    <button class="btn-feedback btn-dislike" title="Dislike">👎 Dislike</button>
+                                    <button class="btn-feedback btn-skip" title="Skip">⏭ Skip</button>
+                                </div>
+                                <button class="btn-fav-heart {% if song.is_favourite %}is-favourite{% endif %}" data-song-id="{{ song.song_id }}">
+                                    <span class="heart-icon">{% if song.is_favourite %}❤️{% else %}🤍{% endif %}</span>
+                                    <span class="heart-text">{% if song.is_favourite %}Added to favorites{% else %}Favorite{% endif %}</span>
+                                </button>
+                                <div class="star-rating-row">
+                                    <span class="rating-label">Rate:</span>
+                                    <div class="star-rating">
+                                        <button class="star-btn" data-rating="1">★</button>
+                                        <button class="star-btn" data-rating="2">★</button>
+                                        <button class="star-btn" data-rating="3">★</button>
+                                        <button class="star-btn" data-rating="4">★</button>
+                                        <button class="star-btn" data-rating="5">★</button>
+                                    </div>
+                                </div>
+                                <div class="audio-error-msg hidden">Audio unavailable for this song.</div>
+                                <div class="feedback-status hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- SECTION F: Calm, Spiritual & Peaceful (Horizontal Row) -->
+        {% if calm_songs %}
+        <section class="home-section" id="calm-recommendations-section">
+            <div class="section-header-row">
+                <div class="section-title-wrap">
+                    <div class="section-icon-badge badge-calm">🍃</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <h2 class="section-title">Calm, Spiritual & Peaceful</h2>
+                            <span class="section-count-badge">{{ calm_songs|length }} songs</span>
+                        </div>
+                        <p class="section-subtitle">Soothing melodies, sufi spiritual reflections, and peaceful acoustic soundtracks.</p>
+                    </div>
+                </div>
+                <div class="row-nav-btns">
+                    <button class="btn-row-scroll" data-target="calm-songs-container" data-dir="-1" title="Scroll Left">◀</button>
+                    <button class="btn-row-scroll" data-target="calm-songs-container" data-dir="1" title="Scroll Right">▶</button>
+                </div>
+            </div>
+
+            <div class="horizontal-cards-row" id="calm-songs-container">
+                {% for song in calm_songs %}
+                    <div class="song-card" data-song-id="{{ song.song_id }}" data-queue-type="calm">
+                        <div class="card-artwork-box">
+                            <img 
+                                src="/api/songs/{{ song.song_id }}/cover" 
+                                alt="{{ song.title }} Cover" 
+                                class="card-poster-img"
+                                loading="lazy"
+                                onerror="this.style.display='none'"
+                            >
+                            <div class="card-poster-overlay"></div>
+                            <span class="card-match-pill">Calm</span>
+                            <button class="btn-play-card" 
+                                data-song-id="{{ song.song_id }}" 
+                                data-title="{{ song.title }}" 
+                                data-artist="{{ song.artist or '' }}" 
+                                data-movie="{{ song.movie or '' }}" 
+                                data-audio-url="{{ song.audio_url }}"
+                                title="Play {{ song.title }}">
+                                ▶
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-title-group">
+                                <h3 class="song-card-title">{{ song.title }}</h3>
+                                <p class="song-card-meta"><span class="movie-name">{{ song.movie or 'Single' }}</span> • {{ song.artist or 'Various' }}</p>
+                            </div>
+                            <div class="card-tags">
+                                <span class="tag tag-mood">🍃 Peaceful</span>
+                                <span class="tag tag-genre">{{ song.genre }}</span>
+                            </div>
+                            <div class="card-footer">
+                                <div class="card-actions-row">
+                                    <button class="btn-feedback btn-like" title="Like">👍 Like</button>
+                                    <button class="btn-feedback btn-dislike" title="Dislike">👎 Dislike</button>
+                                    <button class="btn-feedback btn-skip" title="Skip">⏭ Skip</button>
+                                </div>
+                                <button class="btn-fav-heart {% if song.is_favourite %}is-favourite{% endif %}" data-song-id="{{ song.song_id }}">
+                                    <span class="heart-icon">{% if song.is_favourite %}❤️{% else %}🤍{% endif %}</span>
+                                    <span class="heart-text">{% if song.is_favourite %}Added to favorites{% else %}Favorite{% endif %}</span>
+                                </button>
+                                <div class="star-rating-row">
+                                    <span class="rating-label">Rate:</span>
+                                    <div class="star-rating">
+                                        <button class="star-btn" data-rating="1">★</button>
+                                        <button class="star-btn" data-rating="2">★</button>
+                                        <button class="star-btn" data-rating="3">★</button>
+                                        <button class="star-btn" data-rating="4">★</button>
+                                        <button class="star-btn" data-rating="5">★</button>
+                                    </div>
+                                </div>
+                                <div class="audio-error-msg hidden">Audio unavailable for this song.</div>
+                                <div class="feedback-status hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Global Music Player Bar (Docked smoothly above bottom chat bar) -->
+        <div id="music-player-bar" class="music-player-bar hidden">
+            <div class="player-container">
+                <!-- LEFT SECTION: Artwork, Meta, Status -->
+                <div class="player-track-info">
+                    <div class="player-art-wrap">
+                        <img id="player-cover-art" src="/static/images/default_avatar.svg" alt="Song Cover" class="player-cover-art hidden">
+                        <span id="player-art-placeholder" class="player-art-placeholder">🎵</span>
+                    </div>
+                    <div class="player-meta">
+                        <div class="player-status-badge-row">
+                            <span id="player-status-badge" class="player-status-badge is-playing">▶ Playing</span>
+                        </div>
+                        <h4 id="player-title" class="player-title">Song Title</h4>
+                        <p id="player-artist" class="player-artist">
+                            <span id="player-movie" class="movie-name">Movie</span>
+                            <span id="player-meta-sep">•</span>
+                            <span id="player-artist-name">Artist</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- MIDDLE SECTION: Prev, Play/Pause, Next/Skip, Progress Slider, Duration -->
+                <div class="player-controls-center">
+                    <div class="player-buttons">
+                        <button type="button" id="player-prev-btn" class="player-btn-nav" title="Previous Song (or Restart)">⏮</button>
+                        <button type="button" id="player-play-btn" class="player-btn-main" title="Play">▶</button>
+                        <button type="button" id="player-pause-btn" class="player-btn-main hidden" title="Pause">⏸</button>
+                        <button type="button" id="player-skip-btn" class="player-btn-nav" title="Skip to Next Song">⏭</button>
+                    </div>
+                    <div class="player-progress-row">
+                        <span id="player-current-time" class="player-time">0:00</span>
+                        <input type="range" id="player-progress-bar" class="player-progress-slider" min="0" max="100" value="0" step="0.1" title="Seek Progress">
+                        <span id="player-duration-time" class="player-time">0:00</span>
+                    </div>
+                    <div id="player-status-message" class="player-status-message hidden"></div>
+                </div>
+
+                <!-- RIGHT SECTION: Volume, Like, Dislike, Favourite, Rating, Close -->
+                <div class="player-actions-right">
+                    <!-- Volume Control -->
+                    <div class="player-volume-control">
+                        <span id="player-volume-icon" class="volume-icon" title="Volume">🔊</span>
+                        <input type="range" id="player-volume-slider" class="player-volume-slider" min="0" max="1" step="0.05" value="0.8" title="Volume">
+                    </div>
+
+                    <!-- Like / Dislike Buttons -->
+                    <div class="player-feedback-btns">
+                        <button type="button" id="player-like-btn" class="btn-player-action btn-player-like" title="Like Song">👍</button>
+                        <button type="button" id="player-dislike-btn" class="btn-player-action btn-player-dislike" title="Dislike Song">👎</button>
+                    </div>
+
+                    <!-- Favourite Toggle Button -->
+                    <button type="button" id="player-fav-btn" class="btn-player-fav" title="Add to favorites">
+                        <span class="player-fav-icon">🤍</span>
+                        <span class="player-fav-text">Favorite</span>
+                    </button>
+
+                    <!-- Star Rating 1-5 -->
+                    <div class="player-star-rating" id="player-star-rating" title="Rate this song">
+                        <button type="button" class="player-star-btn" data-rating="1" title="1 Star">★</button>
+                        <button type="button" class="player-star-btn" data-rating="2" title="2 Stars">★</button>
+                        <button type="button" class="player-star-btn" data-rating="3" title="3 Stars">★</button>
+                        <button type="button" class="player-star-btn" data-rating="4" title="4 Stars">★</button>
+                        <button type="button" class="player-star-btn" data-rating="5" title="5 Stars">★</button>
+                    </div>
+
+                    <!-- Close / Stop Button -->
+                    <button type="button" id="player-close-btn" class="btn-player-close" title="Close Player & Stop">✕</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ========================================================================
+         FIXED CHAT BOX AT THE BOTTOM (Requirement 2 & 5)
+         Remains fixed at the bottom of the viewport at all times!
+         ======================================================================== -->
+    <div class="fixed-chat-dock" id="fixed-chat-dock">
+        <div class="chat-dock-inner">
+            <!-- Quick Mood Example Chips (Hidden automatically when song plays) -->
+            <div class="dock-chips-bar" id="dock-chips-bar">
+                <span class="dock-chip-label">Quick Vibes:</span>
+                <button type="button" class="chip-btn chip" data-prompt="I'm feeling romantic today">💖 Romantic</button>
+                <button type="button" class="chip-btn chip" data-prompt="I'm feeling low and want something peaceful">🍃 Peaceful</button>
+                <button type="button" class="chip-btn chip" data-prompt="I need energetic music for my workout">⚡ Workout</button>
+                <button type="button" class="chip-btn chip" data-prompt="I'm going on a road trip">🚗 Road Trip</button>
+                <button type="button" class="chip-btn chip" data-prompt="I want something for a party">🎉 Party</button>
+                <button type="button" class="chip-btn chip" data-prompt="I want something spiritual and calming">✨ Spiritual</button>
+                <button type="button" class="chip-btn chip" data-prompt="Happy and cheerful upbeat songs">☀️ Happy</button>
+            </div>
+
+            <!-- Main Input Row -->
+            <div class="dock-input-row">
+                <div class="input-pill-wrapper">
+                    <span class="dock-search-icon">✨</span>
+                    <input 
+                        type="text" 
+                        id="user-prompt-input" 
+                        class="dock-text-input" 
+                        placeholder="Tell me how you're feeling or what music you want (e.g. 'I want peaceful acoustic love songs')..."
+                        autocomplete="off"
+                    >
+                </div>
+                <button id="recommend-btn" class="dock-btn-recommend">
+                    <span class="btn-icon">⚡</span>
+                    <span>Recommend Songs</span>
+                </button>
+            </div>
+            <div id="loading-spinner" class="loading-state hidden" style="text-align: center; font-size: 0.8rem; color: var(--primary); font-weight: 700; padding-top: 0.2rem;">
+                ⚡ Analyzing your mood & discovering tailored songs...
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
